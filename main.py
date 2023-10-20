@@ -4,32 +4,17 @@
 import pygame as pg
 from pygame.sprite import Sprite
 import random
+from random import randint
 import os
+from settings import *
 
 vec = pg.math.Vector2
 
 # setup asset folders here - images sounds etc.
 game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'images')
-snd_folder = os.path.join('sounds')
 
-# game settings 
-WIDTH = 1400
-HEIGHT = 850
-FPS = 60
-SCORE = 0
 
-# player settings
-PLAYER_JUMP = 30
-PLAYER_GRAV = 2
-
-# define colors
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-SKYBLUE = (150, 200, 255)
 
 def draw_text(text, size, color, x, y):
     font_name = pg.font.match_font('arial')
@@ -42,15 +27,17 @@ def draw_text(text, size, color, x, y):
 class Player(Sprite):
     def __init__(self):
         Sprite.__init__(self)
-        # self.image = pg.Surface((50, 50))
-        # self.image.fill(GREEN)
+        self.image = pg.Surface((50, 50))
+        self.image.fill(BLACK)
         # use an image for player sprite...
         self.image = pg.image.load(os.path.join(img_folder,'Orbo_Character.png')).convert()
         self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
+        self.rect.center = (WIDTH/2, HEIGHT/2)
         self.pos = vec(WIDTH/2, HEIGHT/2)
         self.vel = vec(0,0)
         self.acc = vec(0,0)
+        print(self.rect.center)
     def controls(self):
         keys = pg.key.get_pressed()
         if keys[pg.K_a]:
@@ -65,15 +52,24 @@ class Player(Sprite):
             print("i can jump")
             self.vel.y = -PLAYER_JUMP
     def update(self):
+        # self.rect.x += 5
+        # self.rect.y += 5
         self.acc = vec(0,PLAYER_GRAV)
         self.controls()
-        # friction for side to side 
-        self.acc.x += self.vel.x * -0.3
-
+        # hits = pg.sprite.spritecollide(self, all_platforms, False)
+        # if hits:
+        #     print("i've collided...") 
+        print(all_platforms)
+        # if friction - apply here
+        self.acc.x += self.vel.x * -0.2
+        self.acc.y += self.vel.y * -0.2
         # equations of motion
         self.vel += self.acc
-        self.pos += self.vel + 0.9 * self.acc
-
+        self.pos += self.vel + 0.5 * self.acc
+        if self.rect.x > WIDTH:
+            self.rect.x = 0
+        if self.rect.y > HEIGHT:
+            self.rect.y = 0
         self.rect.midbottom = self.pos
 
 # platforms
@@ -87,6 +83,23 @@ class Platform(Sprite):
         self.rect.x = x
         self.rect.y = y
         print(self.rect.center)
+    def update(self):
+        if self.category == "moving":
+            self.rect.x += self.speed
+            if self.rect.x + self.rect.w > WIDTH or self.rect.x < 0:
+                self.speed = -self.speed
+        if self.category == "ice":
+            self.image.fill(WHITE)
+
+class Mob(Sprite):
+    def __init__(self,x,y,w,h, category):
+        Sprite.__init__(self)
+        self.image = pg.Surface((w,h))
+        self.image.fill(RED)
+        self.rect = self.image.get_rect()
+        self.rect.x = x 
+        self.rect.y = y 
+        print(self.rect.center)
         self.category = category
         self.speed = 10
     def update(self):
@@ -94,7 +107,16 @@ class Platform(Sprite):
             self.rect.x += self.speed
             if self.rect.x + self.rect.w > WIDTH or self.rect.x < 0:
                 self.speed = -self.speed
+                self.rect.y += 25
+        if self.category == "ice":
+            self.image.fill(WHITE)
 
+        if self.rect.y > HEIGHT:
+            self.rect.y = 0
+            # self.kill()
+            # print("this happened")
+            print(all_mobs)
+     
 
 
 # init pygame and create a window
@@ -107,24 +129,29 @@ clock = pg.time.Clock()
 # create a group for all sprites
 all_sprites = pg.sprite.Group()
 all_platforms = pg.sprite.Group()
+all_mobs = pg.sprite.Group()
 
 # instantiate classes
 player = Player()
-plat = Platform(0, 800, 1920, 100, "  ")
-plat1 = Platform(200, 700, 100, 50, "moving")
-plat2 = Platform(600, 600, 100, 50, "moving")
-plat3 = Platform(225, 50, 100, 45, "  ")
+all_sprites.add(player)
+for plat in Platform_List:
+    p=Platform(*plat)
+    all_sprites.add(p)
+    all_platforms.add(p)
+
+for i in range (0,5):
+    m = Mob (randint(0,WIDTH),randint(0,HEIGHT))
+    all_sprites.add(m)
+    all_platforms.add(p)
+
 
 # add instances to groups
 all_sprites.add(player)
 all_sprites.add(plat)
-all_sprites.add(plat1)
-all_sprites.add(plat2)
-all_sprites.add(plat3)
+
+
 all_platforms.add(plat)
-all_platforms.add(plat1)
-all_platforms.add(plat2)
-all_platforms.add(plat3)
+
 
 
 # Game loop
@@ -146,8 +173,6 @@ while running:
     if player.vel.y > 0:
             hits = pg.sprite.spritecollide(player, all_platforms, False)
             if hits:
-                if hits[0].category == 'moving':
-                    player.rect.x = hits [0].rect.x
                 player.pos.y = hits[0].rect.top
                 player.vel.y = 0
                 
@@ -164,7 +189,7 @@ while running:
 
     ############ Draw ################
     # draw the background screen
-    screen.fill(SKYBLUE)
+    screen.fill(BLACK)
     # draw all sprites
     all_sprites.draw(screen)
     draw_text("Score: " + str(SCORE), 22, WHITE, WIDTH/2, HEIGHT/10)
